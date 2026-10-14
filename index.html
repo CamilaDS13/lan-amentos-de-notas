@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controle de Notas & Pagamentos</title>
+  <meta name="description" content="Sistema de gestão e lançamento de notas e pagamentos de sexta-feira, com status visual (lançado/pendente), filtros por loja e lembretes via WhatsApp e e-mail.">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-neutral-50 text-neutral-900 antialiased selection:bg-emerald-100 selection:text-emerald-900 min-h-screen">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    const IconClock = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    );
+    const IconCheckCircle = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    );
+    const IconDollar = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    );
+    const IconCalendar = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    );
+    const IconList = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><polyline points="3 6 4 7 6 5"/><polyline points="3 12 4 13 6 11"/><polyline points="3 18 4 19 6 17"/></svg>
+    );
+    const IconBell = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    );
+    const IconMessage = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+    );
+    const IconDownload = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    );
+    const IconPlus = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    );
+    const IconSearch = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    );
+    const IconStore = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/><path d="M22 7v3a2 2 0 0 1-2 2v0a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 16 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 12 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 8 12a2.7 2.7 0 0 1-1.59-.63.7.7 0 0 0-.82 0A2.7 2.7 0 0 1 4 12v0a2 2 0 0 1-2-2V7"/></svg>
+    );
+    const IconCopy = ({ className = "w-3.5 h-3.5" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    );
+    const IconCheck = ({ className = "w-3.5 h-3.5" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+    );
+    const IconEdit = ({ className = "w-3.5 h-3.5" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    );
+    const IconTrash = ({ className = "w-3.5 h-3.5" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+    );
+    const IconDuplicate = ({ className = "w-3.5 h-3.5" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    );
+    const IconPrinter = ({ className = "w-5 h-5" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+    );
+    const IconSpreadsheet = ({ className = "w-5 h-5" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h8"/><path d="M10 9h1"/></svg>
+    );
+    const IconX = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    );
+    const IconChevronDown = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    );
+    const IconChevronUp = ({ className = "w-4 h-4" }) => (
+      <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+    );
+
+    const ERP_DEFAULTS = {
+      agendaOrcamento: '196',
+      fornecedor: '11697-1',
+      agenda: '349',
+      cfop: '820',
+      obsTemplate: 'REF. CONTROLE DE ENTREGAS LOJA {LOJA} PERIODO {PERIODO}.',
+    };
+
+    function formatCurrencyBRL(num) {
+      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 }).format(num || 0);
+    }
+
+    function formatDateBR(isoStr) {
+      if (!isoStr) return '';
+      const p = isoStr.split('-');
+      return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : isoStr;
+    }
+
+    function getUpcomingFriday(from = new Date()) {
+      const d = new Date(from);
+      const diff = (5 - d.getDay() + 7) % 7;
+      d.setDate(d.getDate() + diff);
+      return d;
+    }
+
+    function getNextFridayAfter(from) {
+      const d = new Date(from);
+      d.setDate(d.getDate() + 7);
+      return d;
+    }
+
+    function formatDateToISO(d) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function isFriday(isoStr) {
+      if (!isoStr) return false;
+      const p = isoStr.split('-');
+      if (p.length !== 3) return false;
+      const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]), 12, 0, 0);
+      return d.getDay() === 5;
+    }
+
+    const INITIAL_NOTES = [
+      { id: '1', data: '2026-10-16', lojaNumero: '01', lojaNome: 'Matriz Centro', numeroPedido: 'PED-48201', numeroGerado: 'GER-918234', valor: 2450.00, status: 'pendente', observacoes: 'REF. CONTROLE DE ENTREGAS LOJA 01 PERIODO 09-16/10.' },
+      { id: '2', data: '2026-10-16', lojaNumero: '04', lojaNome: 'Filial Shopping Sul', numeroPedido: 'PED-48215', numeroGerado: 'GER-918235', valor: 1380.50, status: 'lancado', observacoes: 'REF. CONTROLE DE ENTREGAS LOJA 04 PERIODO 09-16/10.', lancadoEm: '2026-10-13T14:15:00.000Z' },
+      { id: '3', data: '2026-10-16', lojaNumero: '08', lojaNome: 'Loja 08 Zona Norte', numeroPedido: 'PED-48229', numeroGerado: 'GER-918241', valor: 890.00, status: 'pendente', observacoes: 'REF. CONTROLE DE ENTREGAS LOJA 08 PERIODO 09-16/10.' },
+      { id: '4', data: '2026-10-16', lojaNumero: '12', lojaNome: 'Boulevard Leste', numeroPedido: 'PED-48250', numeroGerado: 'GER-918255', valor: 3720.00, status: 'lancado', observacoes: 'REF. CONTROLE DE ENTREGAS LOJA 12 PERIODO 09-16/10.', lancadoEm: '2026-10-14T10:00:00.000Z' },
+      { id: '5', data: '2026-10-16', lojaNumero: '15', lojaNome: 'Galeria Central', numeroPedido: 'PED-48264', numeroGerado: 'GER-918260', valor: 640.25, status: 'pendente', observacoes: 'REF. CONTROLE DE ENTREGAS LOJA 15 PERIODO 09-16/10.' },
+      { id: '6', data: '2026-10-23', lojaNumero: '01', lojaNome: 'Matriz Centro', numeroPedido: 'PED-48302', numeroGerado: 'GER-918288', valor: 4150.00, status: 'pendente', observacoes: 'REF. CONTROLE DE ENTREGAS LOJA 01 PERIODO 16-23/10.' },
+      { id: '7', data: '2026-10-23', lojaNumero: '22', lojaNome: 'Centro de Distribuição', numeroPedido: 'PED-48318', numeroGerado: 'GER-918295', valor: 1980.00, status: 'pendente', observacoes: 'REF. CONTROLE DE ENTREGAS LOJA 22 PERIODO 16-23/10.' },
+      { id: '8', data: '2026-10-09', lojaNumero: '08', lojaNome: 'Loja 08 Zona Norte', numeroPedido: 'PED-48099', numeroGerado: 'GER-917990', valor: 1250.00, status: 'lancado', observacoes: 'REF. CONTROLE DE ENTREGAS LOJA 08 PERIODO 02-09/10.', lancadoEm: '2026-10-09T16:20:00.000Z' }
+    ];
+
+    function App() {
+      const [notes, setNotes] = useState(() => {
+        try {
+          const s = localStorage.getItem('controle_notas_lancamentos_v2') || localStorage.getItem('controle_notas_standalone_v1');
+          if (s) {
+            const p = JSON.parse(s);
+            if (Array.isArray(p)) return p.map(item => ({ ...item, status: item.status === 'pago' ? 'lancado' : item.status }));
+          }
+        } catch (e) {}
+        return INITIAL_NOTES;
+      });
+
+      const [currentTime, setCurrentTime] = useState(new Date());
+      const [fridayFilter, setFridayFilter] = useState('current-friday');
+      const [customDate, setCustomDate] = useState('');
+      const [statusFilter, setStatusFilter] = useState('todos');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [storeFilter, setStoreFilter] = useState('');
+      const [selectedIds, setSelectedIds] = useState([]);
+      const [toastMsg, setToastMsg] = useState(null);
+      const [copiedKey, setCopiedKey] = useState(null);
+      const [isErpCollapsed, setIsErpCollapsed] = useState(false);
+
+      const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+      const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
+      const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+      const [editingNote, setEditingNote] = useState(null);
+
+      const [formData, setFormData] = useState('');
+      const [formLojaNum, setFormLojaNum] = useState('');
+      const [formLojaNome, setFormLojaNome] = useState('');
+      const [formPedido, setFormPedido] = useState('');
+      const [formGerado, setFormGerado] = useState('');
+      const [formValor, setFormValor] = useState('');
+      const [formStatus, setFormStatus] = useState('pendente');
+      const [formObs, setFormObs] = useState('');
+
+      const [whatsappPhone, setWhatsappPhone] = useState('085991677572');
+      const [userEmail, setUserEmail] = useState('camilasousa@bvpinheiro.com.br');
+      const [notifyTime, setNotifyTime] = useState('08:00');
+      const [reminderTab, setReminderTab] = useState('automatic');
+
+      useEffect(() => {
+        localStorage.setItem('controle_notas_lancamentos_v2', JSON.stringify(notes));
+      }, [notes]);
+
+      useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        return () => clearInterval(timer);
+      }, []);
+
+      const showToast = (msg) => {
+        setToastMsg(msg);
+        setTimeout(() => setToastMsg(null), 3500);
+      };
+
+      const copyToClipboard = (text, label, key) => {
+        navigator.clipboard.writeText(text);
+        setCopiedKey(key);
+        showToast(`${label} copiado: ${text}`);
+        setTimeout(() => setCopiedKey(null), 2000);
+      };
+
+      const upcomingFriday = useMemo(() => getUpcomingFriday(), []);
+      const nextFriday = useMemo(() => getNextFridayAfter(upcomingFriday), [upcomingFriday]);
+      const upcomingFridayIso = useMemo(() => formatDateToISO(upcomingFriday), [upcomingFriday]);
+      const nextFridayIso = useMemo(() => formatDateToISO(nextFriday), [nextFriday]);
+
+      const storesList = useMemo(() => {
+        const map = new Map();
+        notes.forEach(n => {
+          if (n.lojaNumero && !map.has(n.lojaNumero)) map.set(n.lojaNumero, n.lojaNome);
+        });
+        return Array.from(map.entries()).map(([numero, nome]) => ({ numero, nome })).sort((a,b) => a.numero.localeCompare(b.numero, undefined, { numeric: true }));
+      }, [notes]);
+
+      const filteredNotes = useMemo(() => {
+        return notes.filter(n => {
+          if (fridayFilter === 'current-friday' && n.data !== upcomingFridayIso) return false;
+          if (fridayFilter === 'next-friday' && n.data !== nextFridayIso) return false;
+          if (fridayFilter === 'all-fridays' && !isFriday(n.data)) return false;
+          if (fridayFilter === 'custom-friday' && customDate && n.data !== customDate) return false;
+          if (statusFilter !== 'todos' && n.status !== statusFilter) return false;
+          if (storeFilter && n.lojaNumero !== storeFilter) return false;
+          if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            return n.lojaNome.toLowerCase().includes(q) ||
+                   n.lojaNumero.toLowerCase().includes(q) ||
+                   n.numeroPedido.toLowerCase().includes(q) ||
+                   n.numeroGerado.toLowerCase().includes(q) ||
+                   (n.observacoes || '').toLowerCase().includes(q);
+          }
+          return true;
+        });
+      }, [notes, fridayFilter, customDate, statusFilter, storeFilter, searchQuery, upcomingFridayIso, nextFridayIso]);
+
+      const stats = useMemo(() => {
+        let total = 0, lancado = 0, pendente = 0, countLancado = 0, countPendente = 0;
+        filteredNotes.forEach(n => {
+          total += n.valor;
+          if (n.status === 'lancado') {
+            lancado += n.valor;
+            countLancado++;
+          } else {
+            pendente += n.valor;
+            countPendente++;
+          }
+        });
+        const percent = total > 0 ? Math.round((lancado / total) * 100) : 0;
+        return { total, lancado, pendente, countLancado, countPendente, totalCount: filteredNotes.length, percent };
+      }, [filteredNotes]);
+
+      const currentFilterLabel = useMemo(() => {
+        if (fridayFilter === 'current-friday') return `Sexta-feira (${formatDateBR(upcomingFridayIso)})`;
+        if (fridayFilter === 'next-friday') return `Próxima Sexta (${formatDateBR(nextFridayIso)})`;
+        if (fridayFilter === 'all-fridays') return 'Todas as Sextas-feiras';
+        if (fridayFilter === 'custom-friday' && customDate) return `Data ${formatDateBR(customDate)}`;
+        return 'Todas as Datas';
+      }, [fridayFilter, upcomingFridayIso, nextFridayIso, customDate]);
+
+      const toggleStatus = (id) => {
+        setNotes(prev => prev.map(n => {
+          if (n.id === id) {
+            const next = n.status === 'lancado' ? 'pendente' : 'lancado';
+            showToast(next === 'lancado' ? `Nota Loja ${n.lojaNumero} marcada como LANÇADA (verde)` : `Nota Loja ${n.lojaNumero} marcada como PENDENTE (vermelho)`);
+            return { ...n, status: next, lancadoEm: next === 'lancado' ? new Date().toISOString() : undefined };
+          }
+          return n;
+        }));
+      };
+
+      const handleBatchSetStatus = (status) => {
+        const isLanc = status === 'lancado';
+        setNotes(prev => prev.map(n => selectedIds.includes(n.id) ? { ...n, status, lancadoEm: isLanc ? (n.lancadoEm || new Date().toISOString()) : undefined } : n));
+        showToast(`${selectedIds.length} notas marcadas como ${isLanc ? 'LANÇADAS' : 'PENDENTES'}.`);
+        setSelectedIds([]);
+      };
+
+      const handleBatchDelete = () => {
+        if (confirm(`Deseja excluir as ${selectedIds.length} notas selecionadas?`)) {
+          setNotes(prev => prev.filter(n => !selectedIds.includes(n.id)));
+          showToast(`${selectedIds.length} notas excluídas.`);
+          setSelectedIds([]);
+        }
+      };
+
+      const openEdit = (n) => {
+        setEditingNote(n);
+        setFormData(n.data);
+        setFormLojaNum(n.lojaNumero);
+        setFormLojaNome(n.lojaNome);
+        setFormPedido(n.numeroPedido);
+        setFormGerado(n.numeroGerado);
+        setFormValor(n.valor.toString());
+        setFormStatus(n.status);
+        setFormObs(n.observacoes || '');
+        setIsFormModalOpen(true);
+      };
+
+      const openNew = () => {
+        setEditingNote(null);
+        setFormData(upcomingFridayIso);
+        setFormLojaNum('');
+        setFormLojaNome('');
+        setFormPedido('');
+        setFormGerado('');
+        setFormValor('');
+        setFormStatus('pendente');
+        setFormObs(ERP_DEFAULTS.obsTemplate.replace('{LOJA}', 'X').replace('{PERIODO}', 'Y'));
+        setIsFormModalOpen(true);
+      };
+
+      const handleSaveNote = (e) => {
+        e.preventDefault();
+        const v = parseFloat(formValor.replace(',', '.'));
+        if (!formData || !formLojaNum.trim() || !formLojaNome.trim() || !formPedido.trim() || !formGerado.trim() || isNaN(v) || v <= 0) {
+          alert('Por favor preencha todos os campos corretamente!');
+          return;
+        }
+
+        if (editingNote) {
+          setNotes(prev => prev.map(n => n.id === editingNote.id ? {
+            ...n,
+            data: formData,
+            lojaNumero: formLojaNum.trim(),
+            lojaNome: formLojaNome.trim(),
+            numeroPedido: formPedido.trim(),
+            numeroGerado: formGerado.trim(),
+            valor: v,
+            status: formStatus,
+            observacoes: formObs.trim(),
+            lancadoEm: formStatus === 'lancado' ? (n.lancadoEm || new Date().toISOString()) : undefined,
+          } : n));
+          showToast(`Lançamento da Loja ${formLojaNum} atualizado!`);
+        } else {
+          setNotes(prev => [{
+            id: 'n-' + Date.now(),
+            data: formData,
+            lojaNumero: formLojaNum.trim(),
+            lojaNome: formLojaNome.trim(),
+            numeroPedido: formPedido.trim(),
+            numeroGerado: formGerado.trim(),
+            valor: v,
+            status: formStatus,
+            observacoes: formObs.trim() || `REF. CONTROLE DE ENTREGAS LOJA ${formLojaNum} PERIODO SEMANAL.`,
+            lancadoEm: formStatus === 'lancado' ? new Date().toISOString() : undefined,
+            criadoEm: new Date().toISOString(),
+          }, ...prev]);
+          showToast(`Novo lançamento da Loja ${formLojaNum} cadastrado com sucesso!`);
+        }
+        setIsFormModalOpen(false);
+      };
+
+      const dispatchWhatsApp = () => {
+        const pending = filteredNotes.filter(n => n.status === 'pendente');
+        let text = `🔔 *LEMBRETE DE LANÇAMENTO DE NOTAS (SEXTA-FEIRA)*\n`;
+        text += `📅 *Referência:* ${currentFilterLabel}\n\n`;
+        text += `📌 *Dados Fixos ERP:*\n• Ag. Orçamento: 196\n• Fornecedor: 11697-1\n• Agenda: 349\n• CFOP: 820\n\n`;
+        text += `📊 *Resumo:*\n• Total Geral: ${formatCurrencyBRL(stats.total)} (${filteredNotes.length} notas)\n• ✅ Lançados: ${formatCurrencyBRL(stats.lancado)}\n• ⏳ *PENDENTES:* ${formatCurrencyBRL(stats.pendente)} (${pending.length} notas)\n\n`;
+        if (pending.length > 0) {
+          text += `⚠️ *Notas Pendentes para Lançamento:*\n`;
+          pending.forEach((n, i) => {
+            text += `${i+1}. *Loja ${n.lojaNumero} - ${n.lojaNome}*\n   • Ped: ${n.numeroPedido} | Gerado: ${n.numeroGerado}\n   • Valor: ${formatCurrencyBRL(n.valor)} | Venc: ${formatDateBR(n.data)}\n`;
+          });
+          text += `\nFavor efetuar os lançamentos no ERP!`;
+        } else {
+          text += `🎉 Tudo Lançado no ERP!`;
+        }
+        let cleanPhone = whatsappPhone.replace(/\D/g, '');
+        if (cleanPhone.startsWith('0')) cleanPhone = cleanPhone.slice(1);
+        if (!cleanPhone.startsWith('55') && cleanPhone.length === 11) cleanPhone = '55' + cleanPhone;
+        window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`, '_blank');
+      };
+
+      const dispatchEmail = () => {
+        const pending = filteredNotes.filter(n => n.status === 'pendente');
+        const subject = `Lembrete: Lançamento de Notas [${currentFilterLabel}] - ${pending.length} Pendentes`;
+        let body = `Olá Camila,\n\nSegue a relação de notas para conferência e lançamento no ERP:\n\n`;
+        body += `DADOS FIXOS ERP:\nAGENDA ORÇAMENTO: 196\nFORNECEDOR: 11697-1\nAGENDA: 349\nCFOP: 820\n\n`;
+        body += `Total Previsto: ${formatCurrencyBRL(stats.total)}\nTotal Lançado: ${formatCurrencyBRL(stats.lancado)}\nTOTAL PENDENTE: ${formatCurrencyBRL(stats.pendente)} (${pending.length} notas)\n\n`;
+        pending.forEach((n, i) => {
+          body += `${i+1}) Loja Nº ${n.lojaNumero} - ${n.lojaNome}\n   Pedido: ${n.numeroPedido} | Gerado: ${n.numeroGerado} | Valor: ${formatCurrencyBRL(n.valor)}\n   Vencimento: ${formatDateBR(n.data)}\n   Obs: ${n.observacoes || '-'}\n\n`;
+        });
+        window.location.href = `mailto:${encodeURIComponent(userEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      };
+
+      const exportCSV = () => {
+        const headers = ['Data Vencimento;Dia;Status;Loja Numero;Loja Nome;Numero Pedido;Numero Gerado;Valor (R$);Data Lancamento;Observacoes'];
+        const rows = filteredNotes.map(n => [
+          formatDateBR(n.data),
+          'Sexta-feira',
+          n.status === 'lancado' ? 'LANÇADO' : 'PENDENTE',
+          `"${n.lojaNumero}"`,
+          `"${n.lojaNome}"`,
+          `"${n.numeroPedido}"`,
+          `"${n.numeroGerado}"`,
+          n.valor.toFixed(2).replace('.', ','),
+          n.lancadoEm ? `"${formatDateBR(n.lancadoEm.slice(0,10))}"` : '""',
+          `"${n.observacoes || ''}"`
+        ].join(';'));
+        const csv = '\uFEFF' + [headers, ...rows].join('\r\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `lancamento_notas_${currentFilterLabel.toLowerCase().replace(/[^a-z0-9]/g, '_')}.csv`;
+        a.click();
+        showToast('Planilha CSV (Excel) baixada!');
+      };
+
+      const downloadICS = () => {
+        const ics = [
+          'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ControleNotas//PT', 'METHOD:PUBLISH', 'BEGIN:VEVENT',
+          'SUMMARY:🔔 Lembrete: Lançamento de Notas no ERP (08:00)',
+          'DESCRIPTION:Horário de conferência e lançamento de notas no ERP.\\nAg. 196\\nForn: 11697-1\\nAg. 349\\nCFOP: 820.',
+          'RRULE:FREQ=WEEKLY;BYDAY=FR', 'STATUS:CONFIRMED', 'BEGIN:VALARM', 'TRIGGER:-PT10M', 'ACTION:DISPLAY',
+          'DESCRIPTION:Lançamento de Notas 08:00', 'END:VALARM', 'END:VEVENT', 'END:VCALENDAR'
+        ].join('\r\n');
+        const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'alarme_sexta_08h.ics';
+        a.click();
+        showToast('Alarme de calendário .ics baixado!');
+      };
+
+      return (
+        <div className="min-h-screen bg-neutral-50 flex flex-col font-sans">
+          {/* Header Superior - Contrato de 3 Zonas */}
+          <header className="sticky top-0 z-30 bg-white border-b border-neutral-200 shadow-xs">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-8">
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-neutral-900 text-white flex items-center justify-center font-bold text-sm tracking-tight shadow-xs">NP</div>
+                <span className="text-lg font-bold tracking-tight text-neutral-900 whitespace-nowrap">Controle de Notas</span>
+              </div>
+
+              <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-neutral-600">
+                <span className="text-neutral-900 font-semibold cursor-default">Lançamentos de Sexta</span>
+                <button onClick={() => setIsReminderModalOpen(true)} className="flex items-center gap-1.5 hover:text-neutral-900 transition-colors whitespace-nowrap text-left cursor-pointer">
+                  <IconBell className="w-4 h-4 text-amber-600" />
+                  <span>Lembretes (Zap / E-mail)</span>
+                  {stats.countPendente > 0 && (
+                    <span className="text-xs font-semibold font-mono text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">{stats.countPendente}</span>
+                  )}
+                </button>
+                <button onClick={() => setIsExportModalOpen(true)} className="flex items-center gap-1.5 hover:text-neutral-900 transition-colors whitespace-nowrap cursor-pointer">
+                  <IconDownload className="w-4 h-4 text-neutral-500" />
+                  <span>Exportar / Relatório</span>
+                </button>
+              </nav>
+
+              <div className="flex items-center gap-3 shrink-0">
+                <button onClick={() => setIsReminderModalOpen(true)} className="md:hidden p-2 text-neutral-600 hover:text-neutral-900 relative rounded-lg border border-neutral-200">
+                  <IconBell className="w-4 h-4" />
+                  {stats.countPendente > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-600 text-white text-[10px] rounded-full flex items-center justify-center font-bold">{stats.countPendente}</span>
+                  )}
+                </button>
+                <button onClick={openNew} className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-neutral-900 rounded-lg hover:bg-neutral-800 active:scale-[0.99] transition shadow-xs whitespace-nowrap cursor-pointer">
+                  <IconPlus className="w-4 h-4" />
+                  <span>Novo Lançamento</span>
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+            {/* 1. Painel Fixo ERP com Relógio ao Vivo */}
+            <div className="bg-neutral-900 text-white rounded-2xl p-4 shadow-md border border-neutral-800 transition-all">
+              <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <IconClock className="w-4 h-4 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">Data & Hora em Tempo Real</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                    </div>
+                    <div className="text-sm font-mono font-bold text-white tabular-nums flex items-center gap-2">
+                      <span className="capitalize">{currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                      <span className="text-emerald-400">·</span>
+                      <span className="text-emerald-300 font-extrabold">{currentTime.toLocaleTimeString('pt-BR')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="hidden sm:inline-block text-[11px] font-semibold text-neutral-400 bg-neutral-800/80 px-2 py-0.5 rounded">Dados Fixos de Lançamento (ERP)</span>
+                  <button onClick={() => setIsErpCollapsed(!isErpCollapsed)} className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition cursor-pointer">
+                    {isErpCollapsed ? <IconChevronDown /> : <IconChevronUp />}
+                  </button>
+                </div>
+              </div>
+
+              {!isErpCollapsed && (
+                <div className="pt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                  <div className="bg-neutral-800/80 hover:bg-neutral-800 border border-neutral-700/70 rounded-xl p-2.5 transition flex flex-col justify-between">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Agenda Orçamento</span>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-base font-bold font-mono text-emerald-400 tabular-nums">196</span>
+                      <button onClick={() => copyToClipboard('196', 'Agenda de Orçamento', 'orc')} className="p-1 rounded hover:bg-neutral-700 text-neutral-300 hover:text-white transition cursor-pointer">
+                        {copiedKey === 'orc' ? <IconCheck className="text-emerald-400" /> : <IconCopy />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-neutral-800/80 hover:bg-neutral-800 border border-neutral-700/70 rounded-xl p-2.5 transition flex flex-col justify-between">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Fornecedor</span>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-base font-bold font-mono text-cyan-400 tabular-nums">11697-1</span>
+                      <button onClick={() => copyToClipboard('11697-1', 'Fornecedor', 'forn')} className="p-1 rounded hover:bg-neutral-700 text-neutral-300 hover:text-white transition cursor-pointer">
+                        {copiedKey === 'forn' ? <IconCheck className="text-emerald-400" /> : <IconCopy />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-neutral-800/80 hover:bg-neutral-800 border border-neutral-700/70 rounded-xl p-2.5 transition flex flex-col justify-between">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Agenda</span>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-base font-bold font-mono text-amber-400 tabular-nums">349</span>
+                      <button onClick={() => copyToClipboard('349', 'Agenda', 'ag')} className="p-1 rounded hover:bg-neutral-700 text-neutral-300 hover:text-white transition cursor-pointer">
+                        {copiedKey === 'ag' ? <IconCheck className="text-emerald-400" /> : <IconCopy />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-neutral-800/80 hover:bg-neutral-800 border border-neutral-700/70 rounded-xl p-2.5 transition flex flex-col justify-between">
+                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">CFOP</span>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-base font-bold font-mono text-purple-400 tabular-nums">820</span>
+                      <button onClick={() => copyToClipboard('820', 'CFOP', 'cfop')} className="p-1 rounded hover:bg-neutral-700 text-neutral-300 hover:text-white transition cursor-pointer">
+                        {copiedKey === 'cfop' ? <IconCheck className="text-emerald-400" /> : <IconCopy />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="col-span-2 bg-neutral-800/80 hover:bg-neutral-800 border border-neutral-700/70 rounded-xl p-2.5 transition flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Observação Padrão do Lançamento</span>
+                      <button onClick={() => copyToClipboard('REF. CONTROLE DE ENTREGAS LOJA X PERIODO Y.', 'Observação Padrão', 'obs')} className="p-1 rounded hover:bg-neutral-700 text-neutral-300 hover:text-white transition cursor-pointer flex items-center gap-1 text-[11px] font-semibold">
+                        {copiedKey === 'obs' ? <><IconCheck className="text-emerald-400" /><span className="text-emerald-400">Copiado</span></> : <><IconCopy /><span>Copiar Obs</span></>}
+                      </button>
+                    </div>
+                    <div className="text-[11.5px] font-mono text-neutral-200 mt-1 select-all break-all leading-tight">
+                      REF. CONTROLE DE ENTREGAS LOJA {storeFilter || 'X'} PERIODO SEMANAL.
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 2. Banner Informativo de Sexta-feira */}
+            <div className="bg-white border border-neutral-200/90 rounded-2xl p-5 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-neutral-900 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <IconCalendar className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-lg font-bold tracking-tight text-neutral-900">{currentFilterLabel}</h1>
+                    {stats.countPendente > 0 ? (
+                      <span className="text-[11px] font-semibold text-rose-800 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-full">{stats.countPendente} pendentes de lançamento</span>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-full">Tudo lançado no ERP</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-neutral-500 mt-0.5 flex items-center gap-2">
+                    <span>Marque como <strong className="text-emerald-700">Lançado</strong> (verde) ou mantenha como <strong className="text-rose-700">Pendente</strong> (vermelho clarinho).</span>
+                    <span className="hidden lg:inline text-neutral-300">|</span>
+                    <span className="hidden lg:inline-flex items-center gap-1 text-[11px] text-emerald-700 font-medium">
+                      <IconClock className="w-3 h-3" /> Disparo automático agendado para 08:00 (Zap: 085991677572)
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5 shrink-0">
+                <button onClick={() => setIsReminderModalOpen(true)} className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition cursor-pointer">
+                  <IconMessage className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Disparar Zap / E-mail</span>
+                </button>
+                <button onClick={openNew} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg shadow-xs transition cursor-pointer">
+                  <IconPlus className="w-3.5 h-3.5" />
+                  <span>Lançar Nota</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 3. Quatro Cards de Estatísticas com Progresso */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white border border-neutral-200/90 rounded-xl p-4 shadow-2xs">
+                <div className="flex items-center justify-between text-xs text-neutral-500 font-medium mb-1">
+                  <span>Total Geral das Notas</span>
+                  <IconDollar className="w-4 h-4 text-neutral-400" />
+                </div>
+                <div className="text-2xl font-bold tracking-tight text-neutral-900 font-mono tabular-nums">{formatCurrencyBRL(stats.total)}</div>
+                <div className="mt-2 text-xs text-neutral-500 flex items-center justify-between">
+                  <span>{stats.totalCount} lançamentos</span>
+                  <span className="text-neutral-400 truncate max-w-[130px]">{currentFilterLabel}</span>
+                </div>
+              </div>
+
+              <div className="bg-emerald-50/60 border border-emerald-200/90 rounded-xl p-4 shadow-2xs">
+                <div className="flex items-center justify-between text-xs text-emerald-800 font-medium mb-1">
+                  <span>Total Lançado no ERP</span>
+                  <IconCheckCircle className="w-4 h-4 text-emerald-600" />
+                </div>
+                <div className="text-2xl font-bold tracking-tight text-emerald-900 font-mono tabular-nums">{formatCurrencyBRL(stats.lancado)}</div>
+                <div className="mt-2 text-xs text-emerald-700 flex items-center justify-between font-medium">
+                  <span>{stats.countLancado} notas lançadas</span>
+                  <span>{stats.percent}% do total</span>
+                </div>
+              </div>
+
+              <div className="bg-rose-50/60 border border-rose-200/90 rounded-xl p-4 shadow-2xs">
+                <div className="flex items-center justify-between text-xs text-rose-800 font-medium mb-1">
+                  <span>Pendente de Lançamento</span>
+                  <IconClock className="w-4 h-4 text-rose-600" />
+                </div>
+                <div className="text-2xl font-bold tracking-tight text-rose-900 font-mono tabular-nums">{formatCurrencyBRL(stats.pendente)}</div>
+                <div className="mt-2 text-xs text-rose-700 flex items-center justify-between font-medium">
+                  <span>{stats.countPendente} pendentes</span>
+                  <span>{stats.totalCount > 0 ? 100 - stats.percent : 0}% em aberto</span>
+                </div>
+              </div>
+
+              <div className="bg-white border border-neutral-200/90 rounded-xl p-4 shadow-2xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between text-xs text-neutral-500 font-medium mb-1">
+                    <span>Progresso dos Lançamentos</span>
+                    <IconList className="w-4 h-4 text-neutral-400" />
+                  </div>
+                  <div className="text-2xl font-bold tracking-tight text-neutral-900 font-mono tabular-nums">{stats.percent}%</div>
+                </div>
+                <div className="mt-2">
+                  <div className="w-full bg-neutral-100 rounded-full h-2 overflow-hidden">
+                    <div className="bg-emerald-600 h-2 rounded-full transition-all duration-300" style={{ width: `${stats.percent}%` }} />
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-neutral-500">
+                    <span>{stats.countLancado} de {stats.totalCount} lançadas</span>
+                    <span className={stats.countPendente === 0 && stats.totalCount > 0 ? 'text-emerald-700 font-semibold' : ''}>
+                      {stats.countPendente === 0 && stats.totalCount > 0 ? 'Tudo lançado no ERP!' : `${stats.countPendente} a lançar`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Barra de Filtros de Sextas, Busca e Lojas */}
+            <div className="bg-white border border-neutral-200/90 rounded-xl p-4 shadow-2xs space-y-4">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
+                  <span className="text-xs font-semibold text-neutral-500 whitespace-nowrap flex items-center gap-1.5 mr-1">
+                    <IconCalendar className="w-4 h-4 text-neutral-700" />
+                    Sextas-feiras:
+                  </span>
+                  <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-lg">
+                    <button onClick={() => setFridayFilter('current-friday')} className={`px-3 py-1.5 text-xs font-medium rounded-md transition whitespace-nowrap cursor-pointer ${fridayFilter==='current-friday'?'bg-white text-neutral-900 shadow-xs font-semibold':'text-neutral-600 hover:text-neutral-900'}`}>
+                      Esta Sexta ({formatDateBR(upcomingFridayIso)})
+                    </button>
+                    <button onClick={() => setFridayFilter('next-friday')} className={`px-3 py-1.5 text-xs font-medium rounded-md transition whitespace-nowrap cursor-pointer ${fridayFilter==='next-friday'?'bg-white text-neutral-900 shadow-xs font-semibold':'text-neutral-600 hover:text-neutral-900'}`}>
+                      Próxima ({formatDateBR(nextFridayIso)})
+                    </button>
+                    <button onClick={() => setFridayFilter('all-fridays')} className={`px-3 py-1.5 text-xs font-medium rounded-md transition whitespace-nowrap cursor-pointer ${fridayFilter==='all-fridays'?'bg-white text-neutral-900 shadow-xs font-semibold':'text-neutral-600 hover:text-neutral-900'}`}>
+                      Todas as Sextas
+                    </button>
+                    <button onClick={() => setFridayFilter('all-dates')} className={`px-3 py-1.5 text-xs font-medium rounded-md transition whitespace-nowrap cursor-pointer ${fridayFilter==='all-dates'?'bg-white text-neutral-900 shadow-xs font-semibold':'text-neutral-600 hover:text-neutral-900'}`}>
+                      Todas as Datas
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5 pl-2 border-l border-neutral-200">
+                    <input type="date" value={customDate} onChange={(e) => { setCustomDate(e.target.value); if(e.target.value) setFridayFilter('custom-friday'); }} className="text-xs bg-neutral-50 border border-neutral-200 rounded-md px-2 py-1.5 text-neutral-800" />
+                    {customDate && <button onClick={() => { setCustomDate(''); setFridayFilter('current-friday'); }} className="text-neutral-400 hover:text-neutral-700 p-1"><IconX /></button>}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => setIsReminderModalOpen(true)} className="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold text-neutral-800 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition cursor-pointer border border-neutral-200/60">
+                    <IconMessage className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Disparos (Zap / E-mail às 08:00)</span>
+                    {stats.countPendente > 0 && <span className="w-2 h-2 rounded-full bg-rose-500"></span>}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-neutral-100">
+                <div className="relative flex-1 min-w-[200px]">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"><IconSearch className="w-4 h-4" /></span>
+                  <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Buscar por loja, número do pedido ou número gerado..." className="w-full pl-9 pr-8 py-2 text-xs bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900 focus:bg-white transition" />
+                  {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700"><IconX /></button>}
+                </div>
+
+                <div className="relative sm:w-56 shrink-0">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none"><IconStore className="w-4 h-4" /></span>
+                  <select value={storeFilter} onChange={(e) => setStoreFilter(e.target.value)} className="w-full pl-9 pr-7 py-2 text-xs bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-900 cursor-pointer">
+                    <option value="">Todas as Lojas</option>
+                    {storesList.map(s => <option key={s.numero} value={s.numero}>Loja {s.numero} - {s.nome}</option>)}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-lg shrink-0">
+                  <button onClick={() => setStatusFilter('todos')} className={`px-3 py-1.5 text-xs font-medium rounded-md transition cursor-pointer ${statusFilter==='todos'?'bg-white text-neutral-900 shadow-xs font-semibold':'text-neutral-600 hover:text-neutral-900'}`}>Todos</button>
+                  <button onClick={() => setStatusFilter('pendente')} className={`px-3 py-1.5 text-xs font-medium rounded-md transition cursor-pointer flex items-center gap-1.5 ${statusFilter==='pendente'?'bg-rose-100 text-rose-900 font-bold shadow-xs':'text-rose-700 hover:bg-rose-50'}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span><span>Pendentes</span>
+                  </button>
+                  <button onClick={() => setStatusFilter('lancado')} className={`px-3 py-1.5 text-xs font-medium rounded-md transition cursor-pointer flex items-center gap-1.5 ${statusFilter==='lancado'?'bg-emerald-100 text-emerald-900 font-bold shadow-xs':'text-emerald-700 hover:bg-emerald-50'}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span><span>Lançados</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 5. Tabela Completa */}
+            <div className="bg-white border border-neutral-200/90 rounded-2xl shadow-2xs overflow-hidden">
+              {selectedIds.length > 0 && (
+                <div className="bg-neutral-900 text-white px-4 py-2.5 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 font-medium">
+                    <span className="font-mono bg-neutral-800 px-2 py-0.5 rounded text-[11px]">{selectedIds.length} selecionadas</span>
+                    <span>Ações em lote:</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => handleBatchSetStatus('lancado')} className="px-2.5 py-1 bg-emerald-700 hover:bg-emerald-600 rounded text-white font-medium flex items-center gap-1 cursor-pointer">
+                      <IconCheckCircle className="w-3.5 h-3.5" /><span>Marcar como Lançadas (Verde)</span>
+                    </button>
+                    <button onClick={() => handleBatchSetStatus('pendente')} className="px-2.5 py-1 bg-rose-700 hover:bg-rose-600 rounded text-white font-medium flex items-center gap-1 cursor-pointer">
+                      <IconClock className="w-3.5 h-3.5" /><span>Marcar como Pendentes</span>
+                    </button>
+                    <button onClick={handleBatchDelete} className="px-2.5 py-1 bg-neutral-800 hover:bg-rose-900 rounded text-neutral-200 hover:text-white font-medium flex items-center gap-1 cursor-pointer">
+                      <IconTrash className="w-3.5 h-3.5" /><span>Excluir</span>
+                    </button>
+                    <button onClick={() => setSelectedIds([])} className="text-neutral-400 hover:text-white ml-2">Cancelar</button>
+                  </div>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-neutral-200 bg-neutral-50/75 text-neutral-600 font-semibold uppercase tracking-wider text-[11px]">
+                      <th className="py-3 px-3 w-10 text-center">
+                        <input type="checkbox" checked={selectedIds.length === filteredNotes.length && filteredNotes.length > 0} onChange={() => setSelectedIds(selectedIds.length === filteredNotes.length ? [] : filteredNotes.map(n => n.id))} className="rounded border-neutral-300 cursor-pointer" />
+                      </th>
+                      <th className="py-3 px-3 w-36">Status / Ação</th>
+                      <th className="py-3 px-3">Data</th>
+                      <th className="py-3 px-3">Loja (Nº e Nome)</th>
+                      <th className="py-3 px-3">Nº do Pedido</th>
+                      <th className="py-3 px-3">Nº Gerado</th>
+                      <th className="py-3 px-4 text-right">Valor (R$)</th>
+                      <th className="py-3 px-3">Observação ERP</th>
+                      <th className="py-3 px-3 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-200/80">
+                    {filteredNotes.map(n => {
+                      const isLanc = n.status === 'lancado';
+                      const isSel = selectedIds.includes(n.id);
+                      return (
+                        <tr key={n.id} className={`transition-colors duration-150 ${isLanc ? 'bg-emerald-50/65 hover:bg-emerald-100/70 text-emerald-950 border-emerald-100' : 'bg-rose-50/65 hover:bg-rose-100/70 text-rose-950 border-rose-100'} ${isSel ? 'ring-1 ring-inset ring-neutral-900/30' : ''}`}>
+                          <td className="py-3 px-3 text-center">
+                            <input type="checkbox" checked={isSel} onChange={() => setSelectedIds(prev => prev.includes(n.id) ? prev.filter(x => x !== n.id) : [...prev, n.id])} className="rounded border-neutral-300 cursor-pointer" />
+                          </td>
+                          <td className="py-3 px-3 whitespace-nowrap">
+                            <button onClick={() => toggleStatus(n.id)} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition shadow-2xs ${isLanc ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-rose-600 text-white hover:bg-rose-700'}`}>
+                              {isLanc ? <><IconCheckCircle className="w-3.5 h-3.5" /><span>LANÇADO</span></> : <><IconClock className="w-3.5 h-3.5" /><span>PENDENTE</span></>}
+                            </button>
+                            {isLanc && n.lancadoEm && <span className="block text-[10px] text-emerald-800/80 mt-0.5 font-mono">{formatDateBR(n.lancadoEm.slice(0,10))}</span>}
+                          </td>
+                          <td className="py-3 px-3 whitespace-nowrap font-mono text-[11.5px]">
+                            <div className="font-semibold">{formatDateBR(n.data)}</div>
+                            <div className="text-[10px] text-neutral-500">{isFriday(n.data) ? <span className="text-emerald-700 font-medium">Sexta-feira</span> : <span className="text-amber-700">Outro dia</span>}</div>
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold px-1.5 py-0.5 rounded text-[11px] bg-neutral-900/10 text-neutral-900 shrink-0">Nº {n.lojaNumero}</span>
+                              <span className="font-semibold text-neutral-900 truncate max-w-[170px]">{n.lojaNome}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 font-mono font-medium text-neutral-800 whitespace-nowrap">{n.numeroPedido}</td>
+                          <td className="py-3 px-3 font-mono text-neutral-700 whitespace-nowrap">
+                            <span className="bg-white/70 border border-neutral-200/80 px-1.5 py-0.5 rounded text-[11px]">{n.numeroGerado}</span>
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-sm tabular-nums whitespace-nowrap">
+                            <span className={isLanc ? 'text-emerald-900' : 'text-rose-950 font-black'}>{formatCurrencyBRL(n.valor)}</span>
+                          </td>
+                          <td className="py-3 px-3 max-w-[220px]">
+                            <p className="text-[11px] text-neutral-700 font-mono truncate" title={n.observacoes}>{n.observacoes || '-'}</p>
+                          </td>
+                          <td className="py-3 px-3 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1">
+                              <button onClick={() => openEdit(n)} className="p-1.5 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60 rounded cursor-pointer transition" title="Editar"><IconEdit /></button>
+                              <button onClick={() => {
+                                setNotes(prev => [{ ...n, id: 'n-' + Date.now(), numeroPedido: `${n.numeroPedido}-2`, numeroGerado: `${n.numeroGerado}-B`, status: 'pendente', lancadoEm: undefined, criadoEm: new Date().toISOString() }, ...prev]);
+                                showToast('Lançamento duplicado como pendente!');
+                              }} className="p-1.5 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200/60 rounded cursor-pointer transition" title="Duplicar"><IconDuplicate /></button>
+                              <button onClick={() => { if(confirm(`Excluir o lançamento da Loja ${n.lojaNumero}?`)) { setNotes(prev => prev.filter(x => x.id !== n.id)); showToast('Lançamento excluído.'); }}} className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-100 rounded cursor-pointer transition" title="Excluir"><IconTrash /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="px-4 py-3 bg-neutral-50/80 border-t border-neutral-200 flex flex-col sm:flex-row items-center justify-between text-xs text-neutral-500 gap-2">
+                <div className="flex items-center gap-2">
+                  <span>Exibindo <strong>{filteredNotes.length}</strong> notas</span>
+                  <span>·</span>
+                  <span className="text-emerald-700 font-semibold">{stats.countLancado} lançadas (verde)</span>
+                  <span>·</span>
+                  <span className="text-rose-700 font-semibold">{stats.countPendente} pendentes (vermelho)</span>
+                </div>
+                <div className="text-neutral-600">Dica: clique em <strong>PENDENTE</strong> ou <strong>LANÇADO</strong> para alternar a cor e status instantaneamente.</div>
+              </div>
+            </div>
+          </main>
+
+          {/* Modal Formulário */}
+          {isFormModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/60 backdrop-blur-xs overflow-y-auto">
+              <div className="bg-white w-full max-w-xl rounded-2xl shadow-xl border border-neutral-200 overflow-hidden my-8">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200 bg-neutral-50/50">
+                  <div>
+                    <h2 className="text-base font-bold text-neutral-900">{editingNote ? 'Editar Lançamento de Nota' : 'Novo Lançamento de Nota (ERP)'}</h2>
+                    <p className="text-xs text-neutral-500 mt-0.5">Preencha os dados do lançamento da nota prevista ou efetuada na sexta-feira.</p>
+                  </div>
+                  <button onClick={() => setIsFormModalOpen(false)} className="p-1.5 text-neutral-400 hover:text-neutral-700 rounded-lg"><IconX /></button>
+                </div>
+                <form onSubmit={handleSaveNote} className="p-6 space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-neutral-700 flex items-center gap-1.5"><IconCalendar className="w-3.5 h-3.5 text-neutral-500" />Data de Vencimento / Sexta-feira</label>
+                      <button type="button" onClick={() => setFormData(upcomingFridayIso)} className="text-[11px] font-medium text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer">Sugerir Próxima Sexta</button>
+                    </div>
+                    <input type="date" value={formData} onChange={e => setFormData(e.target.value)} className="w-full px-3 py-2 text-sm bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-neutral-900" required />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-1">
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">Nº da Loja</label>
+                      <input type="text" placeholder="Ex: 01" value={formLojaNum} onChange={e => { setFormLojaNum(e.target.value); if(!editingNote) setFormObs(`REF. CONTROLE DE ENTREGAS LOJA ${e.target.value || 'X'} PERIODO SEMANAL.`); }} className="w-full px-3 py-2 text-sm bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-neutral-900" required />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">Nome da Loja</label>
+                      <input type="text" placeholder="Ex: Matriz Centro / Filial Norte" value={formLojaNome} onChange={e => setFormLojaNome(e.target.value)} className="w-full px-3 py-2 text-sm bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-neutral-900" required />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">Número do Pedido</label>
+                      <input type="text" placeholder="Ex: PED-10940" value={formPedido} onChange={e => setFormPedido(e.target.value)} className="w-full px-3 py-2 text-sm bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-neutral-900" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">Número Gerado</label>
+                      <input type="text" placeholder="Ex: GER-881923" value={formGerado} onChange={e => setFormGerado(e.target.value)} className="w-full px-3 py-2 text-sm bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-neutral-900" required />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-neutral-700 mb-1 flex items-center gap-1.5"><IconDollar className="w-3.5 h-3.5 text-neutral-500" />Valor da Nota (R$)</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-neutral-500">R$</span>
+                      <input type="text" placeholder="0,00" value={formValor} onChange={e => setFormValor(e.target.value)} className="w-full pl-10 pr-3 py-2 text-sm bg-white border border-neutral-200 rounded-lg font-mono font-semibold focus:outline-none focus:ring-1 focus:ring-neutral-900" required />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 mb-1.5">Situação do Lançamento no ERP</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button type="button" onClick={() => setFormStatus('pendente')} className={`py-2.5 px-3 rounded-lg border text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${formStatus==='pendente'?'bg-rose-100 border-rose-300 text-rose-900 shadow-xs ring-1 ring-rose-400':'bg-rose-50/50 border-rose-200/60 text-rose-700'}`}>
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span><span>Pendente (Vermelho claro)</span>
+                      </button>
+                      <button type="button" onClick={() => setFormStatus('lancado')} className={`py-2.5 px-3 rounded-lg border text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${formStatus==='lancado'?'bg-emerald-100 border-emerald-300 text-emerald-900 shadow-xs ring-1 ring-emerald-400':'bg-emerald-50/50 border-emerald-200/60 text-emerald-700'}`}>
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span><span>Lançado no ERP (Verde)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-neutral-700">Observação do Lançamento (ERP)</label>
+                      <button type="button" onClick={() => setFormObs(`REF. CONTROLE DE ENTREGAS LOJA ${formLojaNum || 'X'} PERIODO SEMANAL.`)} className="text-[11px] font-medium text-neutral-600 hover:text-neutral-900 underline cursor-pointer">Inserir Obs Padrão</button>
+                    </div>
+                    <textarea rows="2" value={formObs} onChange={e => setFormObs(e.target.value)} className="w-full px-3 py-2 text-xs font-mono bg-white border border-neutral-200 rounded-lg text-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-900 resize-none" />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-100">
+                    <button type="button" onClick={() => setIsFormModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-neutral-600 hover:text-neutral-900 rounded-lg">Cancelar</button>
+                    <button type="submit" className="px-5 py-2 text-xs font-bold text-white bg-neutral-900 hover:bg-neutral-800 rounded-lg transition shadow-xs cursor-pointer">{editingNote ? 'Salvar Alterações' : 'Concluir Lançamento'}</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Modal Lembretes */}
+          {isReminderModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/60 backdrop-blur-xs overflow-y-auto">
+              <div className="bg-white w-full max-w-2xl rounded-2xl shadow-xl border border-neutral-200 overflow-hidden my-8">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200 bg-neutral-50/50">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center"><IconBell className="w-4 h-4" /></div>
+                    <div>
+                      <h2 className="text-base font-bold text-neutral-900">Disparos & Lembretes Automáticos das 08:00</h2>
+                      <p className="text-xs text-neutral-500">Notificação automática no WhatsApp (085991677572) e e-mail (camilasousa@bvpinheiro.com.br).</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setIsReminderModalOpen(false)} className="p-1.5 text-neutral-400 hover:text-neutral-700 rounded-lg"><IconX /></button>
+                </div>
+
+                <div className="flex items-center border-b border-neutral-200 bg-neutral-50/30 px-6 gap-2 pt-2">
+                  <button onClick={() => setReminderTab('automatic')} className={`pb-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 cursor-pointer ${reminderTab==='automatic'?'border-emerald-600 text-emerald-900':'border-transparent text-neutral-500'}`}>Disparo Automático (08:00)</button>
+                  <button onClick={() => setReminderTab('whatsapp')} className={`pb-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 cursor-pointer ${reminderTab==='whatsapp'?'border-emerald-600 text-emerald-900':'border-transparent text-neutral-500'}`}>WhatsApp</button>
+                  <button onClick={() => setReminderTab('email')} className={`pb-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 cursor-pointer ${reminderTab==='email'?'border-neutral-900 text-neutral-900':'border-transparent text-neutral-500'}`}>E-mail</button>
+                  <button onClick={() => setReminderTab('calendar')} className={`pb-3 px-3 text-xs font-semibold flex items-center gap-1.5 border-b-2 cursor-pointer ${reminderTab==='calendar'?'border-neutral-900 text-neutral-900':'border-transparent text-neutral-500'}`}>Alarme de Sexta (.ics)</button>
+                </div>
+
+                <div className="p-6">
+                  {reminderTab === 'automatic' && (
+                    <div className="space-y-4 text-xs">
+                      <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-4 text-emerald-950 space-y-2">
+                        <div className="font-bold text-sm text-emerald-900 flex items-center gap-2"><IconClock /><span>Disparo Automático das 08:00</span></div>
+                        <p>O sistema está configurado para avisar pontualmente às <strong>08:00</strong> sobre as notas pendentes de lançamento:</p>
+                        <div className="bg-white/80 border border-emerald-200/80 p-2.5 rounded-lg space-y-1 font-mono text-[11px]">
+                          <div>• <strong>WhatsApp:</strong> {whatsappPhone}</div>
+                          <div>• <strong>E-mail:</strong> {userEmail}</div>
+                          <div>• <strong>Horário de Envio:</strong> {notifyTime} da manhã</div>
+                          <div>• <strong>Parâmetros ERP:</strong> Ag. 196 | Forn. 11697-1 | Ag. 349 | CFOP 820</div>
+                        </div>
+                      </div>
+                      <div className="flex gap-3 justify-end pt-2">
+                        <button onClick={dispatchWhatsApp} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer">Disparar no Zap Agora</button>
+                        <button onClick={dispatchEmail} className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold cursor-pointer">Enviar E-mail Agora</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {reminderTab === 'whatsapp' && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold mb-1">WhatsApp de Destino</label>
+                        <input type="text" value={whatsappPhone} onChange={e=>setWhatsappPhone(e.target.value)} className="w-full px-3 py-2 text-xs border rounded-lg font-mono font-bold" />
+                      </div>
+                      <button onClick={dispatchWhatsApp} className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer">Abrir Conversa no WhatsApp com Relatório</button>
+                    </div>
+                  )}
+
+                  {reminderTab === 'email' && (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold mb-1">E-mail de Destino</label>
+                        <input type="email" value={userEmail} onChange={e=>setUserEmail(e.target.value)} className="w-full px-3 py-2 text-xs border rounded-lg font-mono font-bold" />
+                      </div>
+                      <button onClick={dispatchEmail} className="w-full py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold cursor-pointer">Abrir Cliente de E-mail</button>
+                    </div>
+                  )}
+
+                  {reminderTab === 'calendar' && (
+                    <div className="text-center p-4 border rounded-xl space-y-3">
+                      <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center mx-auto"><IconCalendar className="w-5 h-5" /></div>
+                      <h4 className="text-sm font-bold">Alarme Recorrente Toda Sexta às 08:00</h4>
+                      <p className="text-xs text-neutral-500">Baixe o evento (.ics) para tocar no Google Agenda ou Outlook pontualmente às 08:00 da manhã toda sexta-feira.</p>
+                      <button onClick={downloadICS} className="px-5 py-2.5 bg-purple-700 hover:bg-purple-800 text-white rounded-lg text-xs font-bold cursor-pointer">Baixar Alarme para Minha Agenda (.ics)</button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="px-6 py-3.5 bg-neutral-50 border-t border-neutral-200 flex justify-between items-center text-xs text-neutral-500 font-mono">
+                  <span>{stats.countPendente} pendentes ({formatCurrencyBRL(stats.pendente)})</span>
+                  <button onClick={() => setIsReminderModalOpen(false)} className="px-4 py-1.5 text-xs font-bold text-white bg-neutral-900 rounded-lg">Fechar</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal Exportar */}
+          {isExportModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-neutral-900/60 backdrop-blur-xs overflow-y-auto">
+              <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-neutral-200 overflow-hidden my-8">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-200 bg-neutral-50/50">
+                  <h2 className="text-base font-bold text-neutral-900">Exportar / Relatório de Fechamento (ERP)</h2>
+                  <button onClick={() => setIsExportModalOpen(false)} className="p-1.5 text-neutral-400 hover:text-neutral-700 rounded-lg"><IconX /></button>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-3.5 text-xs text-neutral-700 space-y-1.5">
+                    <div className="flex justify-between font-medium"><span>Período:</span><span className="font-semibold text-neutral-900">{currentFilterLabel}</span></div>
+                    <div className="flex justify-between"><span>Total de Notas:</span><span className="font-mono font-semibold">{filteredNotes.length}</span></div>
+                    <div className="flex justify-between"><span>Valor Total:</span><span className="font-mono font-semibold">{formatCurrencyBRL(stats.total)}</span></div>
+                    <div className="flex justify-between text-emerald-800"><span>Lançadas:</span><span className="font-mono font-semibold">{formatCurrencyBRL(stats.lancado)}</span></div>
+                    <div className="flex justify-between text-rose-800"><span>Pendentes:</span><span className="font-mono font-semibold">{formatCurrencyBRL(stats.pendente)}</span></div>
+                  </div>
+                  <div className="border border-neutral-200 rounded-xl p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center"><IconSpreadsheet /></div>
+                      <div>
+                        <h4 className="text-xs font-bold">Planilha Excel / CSV</h4>
+                        <p className="text-[11px] text-neutral-500">Com acentos UTF-8 e colunas formatadas.</p>
+                      </div>
+                    </div>
+                    <button onClick={exportCSV} className="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold cursor-pointer">Baixar CSV</button>
+                  </div>
+                  <div className="border border-neutral-200 rounded-xl p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center"><IconPrinter /></div>
+                      <div>
+                        <h4 className="text-xs font-bold">Imprimir ou Salvar em PDF</h4>
+                        <p className="text-[11px] text-neutral-500">Folha formatada para assinatura e conferência.</p>
+                      </div>
+                    </div>
+                    <button onClick={() => window.print()} className="px-3 py-1.5 bg-white border border-neutral-300 text-neutral-800 rounded-lg text-xs font-semibold cursor-pointer">Imprimir</button>
+                  </div>
+                </div>
+                <div className="px-6 py-3.5 bg-neutral-50 border-t border-neutral-200 flex justify-end">
+                  <button onClick={() => setIsExportModalOpen(false)} className="px-4 py-2 text-xs font-semibold text-neutral-700 hover:text-neutral-900 rounded-lg">Fechar</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Toast */}
+          {toastMsg && (
+            <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-2.5 bg-neutral-900 text-white text-xs font-semibold rounded-xl shadow-lg border border-neutral-800">
+              <IconCheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{toastMsg}</span>
+              <button onClick={() => setToastMsg(null)} className="ml-2 text-neutral-400 hover:text-white p-0.5">✕</button>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
